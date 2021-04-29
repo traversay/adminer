@@ -2,11 +2,12 @@
 $drivers = array("server" => "MySQL") + $drivers;
 
 if (!defined("DRIVER")) {
+	$full_info_schema = false;
 	define("DRIVER", "server"); // server - backwards compatibility
 	// MySQLi supports everything, MySQL doesn't support multiple result sets, PDO_MySQL doesn't support orgtable
 	if (extension_loaded("mysqli")) {
 		class Min_DB extends MySQLi {
-			var $extension = "MySQLi";
+			var $extension = "MySQLi"; ///< @var string extension name
 
 			function __construct() {
 				parent::init();
@@ -230,7 +231,7 @@ if (!defined("DRIVER")) {
 
 	} elseif (extension_loaded("pdo_mysql")) {
 		class Min_DB extends Min_PDO {
-			var $extension = "PDO_MySQL";
+			var $extension = "PDO_MySQL"; ///< @var string extension name
 
 			function connect($server, $username, $password) {
 				global $adminer;
@@ -366,7 +367,7 @@ if (!defined("DRIVER")) {
 	* @return mixed Min_DB or string for error
 	*/
 	function connect() {
-		global $adminer, $types, $structured_types;
+		global $adminer, $types, $structured_types, $full_info_schema;
 		$connection = new Min_DB;
 		$credentials = $adminer->credentials();
 		if ($connection->connect($credentials[0], $credentials[1], $credentials[2])) {
@@ -376,6 +377,8 @@ if (!defined("DRIVER")) {
 				$structured_types[lang('Strings')][] = "json";
 				$types["json"] = 4294967295;
 			}
+			$res = $connection->query('SELECT 1 FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = DATABASE()');
+			$full_info_schema = ($res && $res->num_rows > 0);
 			return $connection;
 		}
 		$return = $connection->error;
@@ -391,9 +394,10 @@ if (!defined("DRIVER")) {
 	*/
 	function get_databases($flush) {
 		// SHOW DATABASES can take a very long time so it is cached
+		global $full_info_schema;
 		$return = get_session("dbs");
 		if ($return === null) {
-			$query = (min_version(5)
+			$query = (min_version(5) && $full_info_schema
 				? "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA ORDER BY SCHEMA_NAME"
 				: "SHOW DATABASES"
 			); // SHOW DATABASES can be disabled by skip_show_database
@@ -471,7 +475,8 @@ if (!defined("DRIVER")) {
 	* @return array array($name => $type)
 	*/
 	function tables_list() {
-		return get_key_vals(min_version(5)
+		global $full_info_schema;
+		return get_key_vals(min_version(5) && $full_info_schema
 			? "SELECT TABLE_NAME, TABLE_TYPE FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() ORDER BY TABLE_NAME"
 			: "SHOW TABLES"
 		);
@@ -495,8 +500,9 @@ if (!defined("DRIVER")) {
 	* @return array array($name => array("Name" => , "Engine" => , "Comment" => , "Oid" => , "Rows" => , "Collation" => , "Auto_increment" => , "Data_length" => , "Index_length" => , "Data_free" => )) or only inner array with $name
 	*/
 	function table_status($name = "", $fast = false) {
+		global $full_info_schema;
 		$return = array();
-		foreach (get_rows($fast && min_version(5)
+		foreach (get_rows($fast && min_version(5) && $full_info_schema
 			? "SELECT TABLE_NAME AS Name, ENGINE AS Engine, TABLE_COMMENT AS Comment FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() " . ($name != "" ? "AND TABLE_NAME = " . q($name) : "ORDER BY Name")
 			: "SHOW TABLE STATUS" . ($name != "" ? " LIKE " . q(addcslashes($name, "%_\\")) : "")
 		) as $row) {
