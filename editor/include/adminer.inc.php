@@ -87,12 +87,28 @@ class Adminer {
 		return true;
 	}
 
+	function objName($obj, $ctag, $ntag)
+	{
+		if ($obj[$ctag] != '') {
+			$res = json_decode($obj[$ctag], true);
+			if ($res) {
+				if (is_array($res) && isset($res['label']))
+					return $res['label'];
+			}
+			elseif ($ntag == 'field')
+				return preg_replace('~\s+\[.*\]$~', '', $obj[$ctag]);
+			else
+				return $obj[$ctag];
+		}
+		return $obj[$ntag];
+	}
+
 	function tableName($tableStatus) {
-		return h($tableStatus["Comment"] != "" ? $tableStatus["Comment"] : $tableStatus["Name"]);
+		return h($this->objName($tableStatus, 'Comment', 'Name'));
 	}
 
 	function fieldName($field, $order = 0) {
-		return h(preg_replace('~\s+\[.*\]$~', '', ($field["comment"] != "" ? $field["comment"] : $field["field"])));
+		return h($this->objName($field, 'comment', 'field'));
 	}
 
 	function selectLinks($tableStatus, $set = "") {
