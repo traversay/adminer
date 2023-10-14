@@ -16,7 +16,7 @@ if ($adminer->homepage()) {
 	echo '<td>' . lang('Rows');
 	echo "</thead>\n";
 	
-	foreach (table_status() as $table => $row) {
+	foreach (table_status('', false, true) as $table => $row) {
 		$name = $adminer->tableName($row);
 		if (isset($row["Engine"]) && $name != "") {
 			echo '<tr' . odd() . '><td>' . checkbox("tables[]", $table, in_array($table, (array) $_POST["tables"], true));

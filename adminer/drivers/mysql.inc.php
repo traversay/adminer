@@ -499,13 +499,24 @@ if (!defined("DRIVER")) {
 	* @param bool return only "Name", "Engine" and "Comment" fields
 	* @return array array($name => array("Name" => , "Engine" => , "Comment" => , "Oid" => , "Rows" => , "Collation" => , "Auto_increment" => , "Data_length" => , "Index_length" => , "Data_free" => )) or only inner array with $name
 	*/
-	function table_status($name = "", $fast = false) {
+	function table_status($name = "", $fast = false, $bylbl = false) {
 		global $full_info_schema;
 		$return = array();
-		foreach (get_rows($fast && min_version(5) && $full_info_schema
+		$res = get_rows($fast && min_version(5) && $full_info_schema
 			? "SELECT TABLE_NAME AS Name, ENGINE AS Engine, TABLE_COMMENT AS Comment FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() " . ($name != "" ? "AND TABLE_NAME = " . q($name) : "ORDER BY Name")
 			: "SHOW TABLE STATUS" . ($name != "" ? " LIKE " . q(addcslashes($name, "%_\\")) : "")
-		) as $row) {
+		);
+		if ($bylbl)
+		{
+		    usort($res, function($a,$b) {
+			    global $adminer;
+			    $an = $adminer->slug($adminer->tableName($a));
+			    $bn = $adminer->slug($adminer->tableName($b));
+			    return strcmp($an, $bn);
+		    });
+		}
+		foreach ($res as $row)
+		{
 			if ($row["Engine"] == "InnoDB") {
 				// ignore internal comment, unnecessary since MySQL 5.1.21
 				$row["Comment"] = preg_replace('~(?:(.+); )?InnoDB free: .*~', '\1', $row["Comment"]);
