@@ -17,9 +17,17 @@ if (!defined("DRIVER")) {
 				global $adminer;
 				mysqli_report(MYSQLI_REPORT_OFF); // stays between requests, not required since PHP 5.3.4
 				list($host, $port) = explode(":", $server, 2); // part after : is used for port or socket
+				$flags = 0;
 				$ssl = $adminer->connectSsl();
 				if ($ssl) {
+				    if (!empty($ssl['ca']) && !empty($ssl['cert']) && !empty($ssl['key']))
+				    {
 					$this->ssl_set($ssl['key'], $ssl['cert'], $ssl['ca'], '', '');
+					# 64 - MYSQLI_CLIENT_SSL_DONT_VERIFY_SERVER_CERT (defined only in PHP 5.6.16+)
+					$flags = 64;
+				    }
+				    if (!empty($ssl['client']))
+					$flags = MYSQLI_CLIENT_SSL;
 				}
 				$return = @$this->real_connect(
 					($server != "" ? $host : ini_get("mysqli.default_host")),
@@ -28,9 +36,10 @@ if (!defined("DRIVER")) {
 					$database,
 					(is_numeric($port) ? $port : ini_get("mysqli.default_port")),
 					(!is_numeric($port) ? $port : $socket),
-					($ssl ? 64 : 0) // 64 - MYSQLI_CLIENT_SSL_DONT_VERIFY_SERVER_CERT (not available before PHP 5.6.16)
+					$flags
 				);
 				$this->options(MYSQLI_OPT_LOCAL_INFILE, false);
+
 				return $return;
 			}
 
@@ -246,6 +255,10 @@ if (!defined("DRIVER")) {
 					}
 					if (!empty($ssl['ca'])) {
 						$options[PDO::MYSQL_ATTR_SSL_CA] = $ssl['ca'];
+					}
+					if (!empty($ssl['client'])) {
+						$options[PDO::MYSQL_ATTR_SSL_CIPHER] = 'ECDHE-RSA-AES128-GCM-SHA256';
+						$options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
 					}
 				}
 				$this->dsn(

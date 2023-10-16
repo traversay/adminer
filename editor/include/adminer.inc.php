@@ -14,6 +14,9 @@ class Adminer {
 	}
 
 	function connectSsl() {
+		$sfx = 's';
+		if (substr_compare(strtolower(basename(__FILE__, '.php')), $sfx, -strlen($sfx)) === 0)
+			return [ 'client' => true ];
 	}
 
 	function permanentLogin($create = false) {
