@@ -154,6 +154,17 @@ if (isset($_GET["username"]) && !class_exists("Min_DB")) {
 
 stop_session(true);
 
+call_user_func(function() {
+    if (!isset($_GET['username']) || (is_string($pw = get_password()) && $pw != ''))
+	return;
+    if (function_exists('get_dbcfg')) {
+	if (gettype($cfg = get_dbcfg()) != 'string')
+	    set_password(DRIVER, SERVER, $_GET['username'], $cfg['password']);
+    }
+    if (isset($_GET['dbcfg']) && !isset($_COOKIE['dbcfg']))
+	cookie('dbcfg', $_GET['dbcfg'], 0);
+});
+
 if (isset($_GET["username"]) && is_string(get_password())) {
 	list($host, $port) = explode(":", SERVER, 2);
 	if (preg_match('~^\s*([-+]?\d+)~', $port, $match) && ($match[1] < 1024 || $match[1] > 65535)) { // is_numeric('80#') would still connect to port 80
