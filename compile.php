@@ -66,6 +66,11 @@ header("Cache-Control: immutable");
 	}
 	if (basename($match[2]) != "lang.inc.php" || !$_SESSION["lang"]) {
 		if (basename($match[2]) == "lang.inc.php") {
+			// Remove discarded languages from the $langs array
+			// (hoping that Jakub will not change the file too much in the future :-) )
+			global $RmLngs;
+			if ($RmLngs)
+				$return = preg_replace("/\t'($RmLngs)' => '[^']*'.*\n/", '', $return);
 			$return = str_replace('function lang($idf, $number = null) {', 'function lang($idf, $number = null) {
 	if (is_string($idf)) { // compiled version uses numbers, string comes from a plugin
 		// English translation is closest to the original identifiers //! pluralized translations are not found
@@ -359,6 +364,46 @@ if (isset($langs[$_SESSION["lang"]])) {
 	array_shift($_SERVER["argv"]);
 }
 
+//  Add multiple-language selection from ADMINER_LANGS.
+//  On return from the user_func:
+//	$langs is the array of languages, possibly modified
+//	$RmLngs is the |-separated list of languages to discard, possibly empty
+//	$Langs is the contents of the ADMINER_LANGS variable, possibly empty
+list($langs, $RmLngs, $Langs) = call_user_func(function($lngs, $var) {
+	// If single language selected, do nothing
+	if ($_SESSION['lang'] != '')
+		return array( $lngs, '', '' );
+	$rms = array();
+	if (($val = getenv($var))) {
+		$prg = basename($_SERVER['argv'][0]);
+		$sel = explode('+', $val);
+		// Check first that specified languages exist
+		foreach ($sel as $lng) {
+			if (!isset($lngs[$lng])) {
+				echo "$prg: unknown language $lng in $var=$val\n";
+				exit(1);
+			}
+		}
+		// Then gather them in the same order as in adminer/include/lang.inc.php
+		$_lngs = $rms = array();
+		foreach ($lngs as $lng => $lbl) {
+			if (in_array($lng, $sel))
+				$_lngs[$lng] = $lngs[$lng];
+			else
+				$rms[] = $lng;
+		}
+		// If only 1 language specified, ask to use the standard way
+		if (count($_lngs) == 1) {
+		    $lng = array_keys($_lngs)[0];
+		    echo "Only language in $var is '$lng': pass it instead to $prg as 3rd argument\n";
+		    $_SERVER['argv'][1] = 'ignored';
+		    return;
+		}
+		$lngs = $_lngs;
+	}
+	return array( $lngs, implode('|', $rms), $val );
+}, $langs, 'ADMINER_LANGS');
+
 if ($_SERVER["argv"][1]) {
 	echo "Usage: php compile.php [editor] [driver] [lang]\n";
 	echo "Purpose: Compile adminer[-driver][-lang].php or editor[-driver][-lang].php.\n";
@@ -451,6 +496,10 @@ $file = preg_replace('~"\.\./externals/jush/modules/(jush\.js)"~', $replace, $fi
 $file = preg_replace("~<\\?php\\s*\\?>\n?|\\?>\n?<\\?php~", '', $file);
 $file = php_shrink($file);
 
-$filename = $project . (preg_match('~-dev$~', $VERSION) ? "" : "-$VERSION") . ($driver ? "-$driver" : "") . ($_SESSION["lang"] ? "-$_SESSION[lang]" : "") . ".php";
+// Possibly customize the output's directory and filename
+// The $Langs variable from ADMINER_LANGS may also be used
+$dir = getenv('ADMINER_PUTDIR');
+$ver = getenv('ADMINER_VERSION');
+$filename = ($dir ? "$dir/" : '') . $project . ($ver === false ? (preg_match('~-dev$~', $VERSION) ? "" : "-$VERSION") : $ver). ($driver ? "-$driver" : "") . ($_SESSION["lang"] ? "-$_SESSION[lang]" : "") . ($Langs ? "-$Langs" : "") . ".php";
 file_put_contents($filename, $file);
 echo "$filename created (" . strlen($file) . " B).\n";

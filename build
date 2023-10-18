@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+#	build - Build our choice of adminer/editor language packs
+#
+#   Customize output's dir and filename
+export ADMINER_PUTDIR='work'
+#export ADMINER_VERSION=''
+
+#   Build our multi-language versions
+mkdir -p "$ADMINER_PUTDIR"
+for langs in en+fr en+fr+de+he en+fr+de+nl+es+it
+do
+    ADMINER_LANGS="$langs" php compile.php mysql
+    ADMINER_LANGS="$langs" php compile.php editor mysql
+done
+
+#   Also build the standard all-languages version
+php compile.php mysql
+php compile.php editor mysql
